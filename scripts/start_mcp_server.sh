@@ -70,7 +70,7 @@ trap "echo ''; echo 'Deteniendo MCP server...'; kill $MCP_PID 2>/dev/null; exit 
 
 # Arrancar ngrok en background
 echo "[2/2] Iniciando ngrok tunnel en puerto $PORT..."
-ngrok http "$PORT" --log=stdout --log-format=json &
+ngrok http "$PORT" --host-header=rewrite --log=stdout --log-format=json &
 NGROK_PID=$!
 
 # Esperar a que ngrok exponga la URL (consulta la API local de ngrok)
