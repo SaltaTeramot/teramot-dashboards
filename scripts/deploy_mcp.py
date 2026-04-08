@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 """
-MCP local para deploy de dashboards Teramot.
+MCP server para deploy de dashboards Teramot.
 Expone: deploy_dashboard, list_dashboards
+
+Modos de ejecución:
+  stdio (default):  python deploy_mcp.py
+  HTTP/SSE:         python deploy_mcp.py --http
 """
 
 import json
 import os
 import subprocess
+import sys
 import textwrap
 from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.server.fastmcp import FastMCP
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -22,8 +25,10 @@ REPO_PATH = Path(os.environ["GITHUB_REPO_PATH"])
 PAGES_URL = os.environ["GITHUB_PAGES_URL"].rstrip("/")
 DASHBOARDS_DIR = REPO_PATH / "dashboards"
 
-app = Server("teramot-deploy")
+mcp = FastMCP("teramot-deploy")
 
+
+# ── helpers ──────────────────────────────────────────────────────────────────
 
 def _generate_refresh_py(gold_table: str, athena_database: str, athena_output: str) -> str:
     return textwrap.dedent(f'''\
@@ -93,7 +98,8 @@ def _generate_refresh_py(gold_table: str, athena_database: str, athena_output: s
             )
             rows = fetch_results(client, execution_id)
 
-            today = date.today().isoformat() if False else __import__("datetime").date.today().isoformat()
+            import datetime
+            today = datetime.date.today().isoformat()
             data_block = (
                 DATA_START + "\\n"
                 "<script>\\n"
@@ -145,96 +151,86 @@ def _git_push(message: str):
     run(["git", "push"])
 
 
-@app.list_tools()
-async def list_tools() -> list[Tool]:
-    return [
-        Tool(
-            name="deploy_dashboard",
-            description="Sube un dashboard HTML al repo y hace push para publicarlo en GitHub Pages.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "html": {"type": "string", "description": "HTML completo del dashboard"},
-                    "gold_table": {"type": "string", "description": "Nombre de la tabla gold en Athena"},
-                    "nombre": {"type": "string", "description": "Slug del dashboard (minúsculas, guiones)"},
-                    "cliente": {"type": "string", "description": "Nombre legible del cliente"},
-                    "athena_database": {
-                        "type": "string",
-                        "description": "Base de datos en Athena",
-                        "default": "teramot_gold",
-                    },
-                },
-                "required": ["html", "gold_table", "nombre", "cliente"],
-            },
-        ),
-        Tool(
-            name="list_dashboards",
-            description="Lista los dashboards deployados con sus URLs y última actualización.",
-            inputSchema={"type": "object", "properties": {}},
-        ),
-    ]
+# ── tools ────────────────────────────────────────────────────────────────────
+
+@mcp.tool()
+async def deploy_dashboard(
+    html: str,
+    gold_table: str,
+    nombre: str,
+    cliente: str,
+    athena_database: str = "teramot_gold",
+) -> str:
+    """
+    Sube un dashboard HTML al repo y hace push para publicarlo en GitHub Pages.
+
+    Args:
+        html: HTML completo del dashboard (debe incluir delimitadores TERAMOT_DATA_START/END)
+        gold_table: Nombre de la tabla gold en Athena (ej: gold_ventas_region_farmacia)
+        nombre: Slug del dashboard en minúsculas con guiones (ej: farmacia-ventas)
+        cliente: Nombre legible del cliente (ej: Farmacia Demo)
+        athena_database: Base de datos en Athena (default: teramot_gold)
+    """
+    if "<!-- TERAMOT_DATA_START -->" not in html or "<!-- TERAMOT_DATA_END -->" not in html:
+        return "ERROR: El HTML no contiene los delimitadores TERAMOT_DATA_START/END."
+
+    dash_dir = DASHBOARDS_DIR / nombre
+    dash_dir.mkdir(parents=True, exist_ok=True)
+
+    (dash_dir / "index.html").write_text(html, encoding="utf-8")
+
+    config = _generate_config_json(nombre, cliente, gold_table, athena_database)
+    (dash_dir / "config.json").write_text(
+        json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    athena_output = config["athena_output"]
+    (dash_dir / "refresh.py").write_text(
+        _generate_refresh_py(gold_table, athena_database, athena_output), encoding="utf-8"
+    )
+
+    try:
+        _git_push(f"deploy: {nombre} ({cliente})")
+    except RuntimeError as e:
+        return f"ERROR en git push: {e}"
+
+    url = f"{PAGES_URL}/dashboards/{nombre}/"
+    return f"Dashboard deployado exitosamente.\nURL: {url}"
 
 
-@app.call_tool()
-async def call_tool(name: str, arguments: dict):
-    if name == "deploy_dashboard":
-        html: str = arguments["html"]
-        gold_table: str = arguments["gold_table"]
-        nombre: str = arguments["nombre"]
-        cliente: str = arguments["cliente"]
-        athena_database: str = arguments.get("athena_database", "teramot_gold")
+@mcp.tool()
+async def list_dashboards() -> str:
+    """Lista los dashboards deployados con sus URLs y fecha de creación."""
+    if not DASHBOARDS_DIR.exists():
+        return "No hay dashboards deployados todavía."
 
-        if "<!-- TERAMOT_DATA_START -->" not in html or "<!-- TERAMOT_DATA_END -->" not in html:
-            return [TextContent(type="text", text="ERROR: El HTML no contiene los delimitadores TERAMOT_DATA_START/END.")]
-
-        dash_dir = DASHBOARDS_DIR / nombre
-        dash_dir.mkdir(parents=True, exist_ok=True)
-
-        (dash_dir / "index.html").write_text(html, encoding="utf-8")
-
-        config = _generate_config_json(nombre, cliente, gold_table, athena_database)
-        (dash_dir / "config.json").write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
-
-        athena_output = config["athena_output"]
-        (dash_dir / "refresh.py").write_text(
-            _generate_refresh_py(gold_table, athena_database, athena_output), encoding="utf-8"
+    lines = []
+    for dash_dir in sorted(DASHBOARDS_DIR.iterdir()):
+        config_path = dash_dir / "config.json"
+        if not config_path.exists():
+            continue
+        with open(config_path) as f:
+            config = json.load(f)
+        url = f"{PAGES_URL}/dashboards/{dash_dir.name}/"
+        lines.append(
+            f"- **{config['nombre']}** ({config['cliente']})\n"
+            f"  URL: {url}\n"
+            f"  Creado: {config['creado']}"
         )
 
-        try:
-            _git_push(f"deploy: {nombre} ({cliente})")
-        except RuntimeError as e:
-            return [TextContent(type="text", text=f"ERROR en git push: {e}")]
+    if not lines:
+        return "No hay dashboards deployados todavía."
 
-        url = f"{PAGES_URL}/dashboards/{nombre}/"
-        return [TextContent(type="text", text=f"Dashboard deployado exitosamente.\nURL: {url}")]
-
-    elif name == "list_dashboards":
-        if not DASHBOARDS_DIR.exists():
-            return [TextContent(type="text", text="No hay dashboards deployados todavía.")]
-
-        lines = []
-        for dash_dir in sorted(DASHBOARDS_DIR.iterdir()):
-            config_path = dash_dir / "config.json"
-            if not config_path.exists():
-                continue
-            with open(config_path) as f:
-                config = json.load(f)
-            url = f"{PAGES_URL}/dashboards/{dash_dir.name}/"
-            lines.append(f"- **{config['nombre']}** ({config['cliente']})\n  URL: {url}\n  Creado: {config['creado']}")
-
-        if not lines:
-            return [TextContent(type="text", text="No hay dashboards deployados todavía.")]
-
-        return [TextContent(type="text", text="\n\n".join(lines))]
-
-    return [TextContent(type="text", text=f"Tool desconocida: {name}")]
+    return "\n\n".join(lines)
 
 
-async def main():
-    async with stdio_server() as (read_stream, write_stream):
-        await app.run(read_stream, write_stream, app.create_initialization_options())
-
+# ── entrypoint ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    if "--http" in sys.argv:
+        import uvicorn
+        port = int(os.environ.get("MCP_PORT", "8080"))
+        print(f"Iniciando MCP server HTTP/SSE en http://0.0.0.0:{port}/sse")
+        uvicorn.run(mcp.sse_app(), host="0.0.0.0", port=port)
+    else:
+        mcp.run()  # stdio (default para Claude Code CLI)
