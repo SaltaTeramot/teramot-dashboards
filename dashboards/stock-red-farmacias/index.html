@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Stock · Red MedMart</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f5f5f0;color:#1a1a1a}
+.topbar{background:#fff;border-bottom:1px solid #e8e8e3;padding:14px 24px;display:flex;align-items:center;gap:12px}
+.topbar-title{font-size:16px;font-weight:600}
+.topbar-sub{font-size:12px;color:#888;margin-left:4px}
+.badge{display:inline-block;font-size:11px;font-weight:500;padding:2px 9px;border-radius:99px}
+.b-danger{background:#FCEBEB;color:#A32D2D}
+.b-warning{background:#FAEEDA;color:#854F0B}
+.b-ok{background:#EAF3DE;color:#3B6D11}
+.b-info{background:#E6F1FB;color:#185FA5}
+.b-neutral{background:#f1efe8;color:#5f5e5a}
+.container{max-width:1200px;margin:0 auto;padding:24px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.kpi{background:#fff;border-radius:10px;padding:16px 18px;border:1px solid #e8e8e3}
+.kpi-label{font-size:11px;color:#888;margin-bottom:4px}
+.kpi-val{font-size:24px;font-weight:600}
+.kpi-sub{font-size:11px;color:#aaa;margin-top:2px}
+.section{margin-bottom:24px}
+.sec-hdr{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.sec-hdr::after{content:'';flex:1;height:1px;background:#e8e8e3}
+.card{background:#fff;border-radius:10px;border:1px solid #e8e8e3;overflow:hidden}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{background:#f9f9f6;font-size:11px;font-weight:600;color:#888;text-align:left;padding:9px 14px;border-bottom:1px solid #e8e8e3}
+.tbl td{padding:9px 14px;border-bottom:1px solid #f0f0ea;vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:#fafaf7}
+.bar-track{width:72px;height:6px;background:#f0f0ea;border-radius:99px;display:inline-block;vertical-align:middle}
+.bar-fill{height:6px;border-radius:99px;display:block}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
+.search-wrap{display:flex;gap:8px;margin-bottom:10px}
+.search-box{flex:1;background:#fff;border:1px solid #ddd;border-radius:8px;padding:9px 14px;font-size:13px;color:#1a1a1a;outline:none}
+.search-box:focus{border-color:#378ADD}
+.filter-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.fpill{font-size:12px;padding:5px 13px;border-radius:99px;border:1px solid #e0e0da;background:#f9f9f6;color:#666;cursor:pointer}
+.fpill.act{background:#E6F1FB;color:#185FA5;border-color:#B5D4F4}
+.result-card{border:1px solid #e8e8e3;border-radius:10px;overflow:hidden;margin-bottom:10px;background:#fff}
+.result-hdr{background:#f9f9f6;padding:10px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid #e8e8e3}
+.result-hdr-name{font-size:13px;font-weight:600}
+.result-hdr-meta{font-size:11px;color:#888}
+.no-results{text-align:center;padding:2.5rem;color:#aaa;font-size:13px;background:#fff;border-radius:10px;border:1px solid #e8e8e3}
+.cat-card{background:#fff;border-radius:10px;border:1px solid #e8e8e3;padding:14px 16px}
+.cat-name{font-size:12px;font-weight:600;margin-bottom:10px}
+.cat-row{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.cat-lbl{font-size:11px;color:#888;width:84px}
+.cat-bar{flex:1;height:5px;background:#f0f0ea;border-radius:99px;overflow:hidden}
+.cat-bar-fill{height:5px;border-radius:99px}
+.cat-val{font-size:11px;color:#aaa;width:40px;text-align:right}
+.chart-wrap{padding:16px;height:220px;position:relative}
+@media(max-width:700px){.kpis{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <span class="topbar-title">Gestión de Stock · Red MedMart</span>
+    <span class="topbar-sub">· Datos actualizados diariamente</span>
+  </div>
+  <div style="margin-left:auto;font-size:11px;color:#aaa" id="fecha-act"></div>
+</div>
+
+<!-- TERAMOT_DATA_START -->
+<script>
+const DASHBOARD_DATA = {
+  kpis: { sucursales: 25, skus: 15508, bajo_minimo: 941, sobrestock: 1797, normal: 2980, sin_config: 110317 },
+  branches: [
+    {name:"MedMart Northgate",city:"Greenfield",state:"OH",hq:false,skus:9005,bajo:263,sobre:267,normal:347,units:65591,cob:228.2},
+    {name:"MedMart Summit",city:"Lakeside",state:"TX",hq:false,skus:8725,bajo:49,sobre:384,normal:673,units:63009,cob:175.3},
+    {name:"MedMart Crestview",city:"Midtown",state:"NY",hq:false,skus:7910,bajo:0,sobre:0,normal:0,units:44021,cob:null},
+    {name:"MedMart Stonegate",city:"Southpark",state:"NC",hq:false,skus:7792,bajo:85,sobre:180,normal:270,units:39812,cob:189.7},
+    {name:"MedMart Valley",city:"Uptown",state:"TX",hq:false,skus:7625,bajo:0,sobre:0,normal:0,units:43756,cob:null},
+    {name:"MedMart Maplewood",city:"Springdale",state:"AR",hq:false,skus:6660,bajo:1,sobre:0,normal:0,units:27776,cob:null},
+    {name:"MedMart Pinehurst",city:"Parkway",state:"TX",hq:false,skus:6575,bajo:4,sobre:80,normal:229,units:33166,cob:141.1},
+    {name:"MedMart Eastview",city:"Fairview",state:"TX",hq:false,skus:5631,bajo:4,sobre:0,normal:0,units:22468,cob:null},
+    {name:"MedMart Parkway",city:"Greenway",state:"TX",hq:false,skus:5561,bajo:236,sobre:257,normal:274,units:27933,cob:218.0},
+    {name:"MedMart Central",city:"Hillcrest",state:"CA",hq:false,skus:5285,bajo:3,sobre:2,normal:16,units:19125,cob:100.6},
+    {name:"MedMart Meadowbrook",city:"Harbor View",state:"WA",hq:false,skus:4973,bajo:103,sobre:198,normal:280,units:26614,cob:182.9},
+    {name:"MedMart Fairfield",city:"Northgate",state:"WA",hq:false,skus:4957,bajo:23,sobre:33,normal:24,units:19200,cob:188.9},
+    {name:"MedMart Greenway",city:"Crestview",state:"FL",hq:false,skus:4047,bajo:0,sobre:0,normal:0,units:15453,cob:null},
+    {name:"MedMart Oakwood",city:"Valley Falls",state:"KS",hq:false,skus:3671,bajo:34,sobre:314,normal:699,units:13473,cob:211.6},
+    {name:"MedMart Plaza",city:"Sunset Hills",state:"MO",hq:false,skus:2756,bajo:107,sobre:46,normal:50,units:9015,cob:168.6},
+    {name:"MedMart Riverside",city:"Maplewood",state:"NJ",hq:false,skus:2755,bajo:23,sobre:36,normal:118,units:7327,cob:142.5},
+    {name:"MedMart Sunset",city:"Ridgeview",state:"WA",hq:false,skus:2322,bajo:0,sobre:0,normal:0,units:6093,cob:null},
+    {name:"MedMart Uptown",city:"Meadowbrook",state:"PA",hq:false,skus:2276,bajo:5,sobre:0,normal:0,units:7282,cob:null},
+    {name:"MedMart Harbor",city:"Stonegate",state:"AZ",hq:false,skus:685,bajo:1,sobre:0,normal:0,units:1569,cob:null},
+    {name:"MedMart Brookside",city:"Eastview",state:"MN",hq:true,skus:43,bajo:0,sobre:0,normal:0,units:171,cob:null},
+  ],
+  categories: [
+    {name:"Medications",skus:6353,bajo:853,sobre:1508,normal:2789,color:"#378ADD"},
+    {name:"Perfumery",skus:8284,bajo:84,sobre:287,normal:189,color:"#1D9E75"},
+    {name:"Dermocosmetics",skus:830,bajo:2,sobre:0,normal:1,color:"#7F77DD"},
+    {name:"Accessories & otros",skus:41,bajo:2,sobre:2,normal:1,color:"#BA7517"},
+  ],
+  products: [
+    {id:"36643",name:"product#36643",cat:"Medications",manuf:"Pfizer",branches:[
+      {branch:"MedMart Northgate",state:"OH",stock:126,min:10,max:110,estado:"SOBRESTOCK"},
+      {branch:"MedMart Parkway",state:"TX",stock:80,min:10,max:110,estado:"SOBRESTOCK"},
+      {branch:"MedMart Summit",state:"TX",stock:55,min:10,max:110,estado:"NORMAL"},
+      {branch:"MedMart Meadowbrook",state:"WA",stock:42,min:10,max:110,estado:"NORMAL"},
+      {branch:"MedMart Stonegate",state:"NC",stock:58,min:10,max:110,estado:"NORMAL"},
+      {branch:"MedMart Oakwood",state:"KS",stock:35,min:10,max:110,estado:"NORMAL"},
+      {branch:"MedMart Riverside",state:"NJ",stock:37,min:10,max:110,estado:"NORMAL"},
+      {branch:"MedMart Fairfield",state:"WA",stock:5,min:10,max:110,estado:"BAJO MINIMO"},
+    ]},
+    {id:"42783",name:"product#42783",cat:"Medications",manuf:"Microsules",branches:[
+      {branch:"MedMart Northgate",state:"OH",stock:80,min:5,max:60,estado:"SOBRESTOCK"},
+      {branch:"MedMart Summit",state:"TX",stock:45,min:5,max:60,estado:"NORMAL"},
+      {branch:"MedMart Parkway",state:"TX",stock:22,min:5,max:60,estado:"NORMAL"},
+      {branch:"MedMart Stonegate",state:"NC",stock:18,min:5,max:60,estado:"NORMAL"},
+      {branch:"MedMart Oakwood",state:"KS",stock:14,min:5,max:60,estado:"NORMAL"},
+      {branch:"MedMart Meadowbrook",state:"WA",stock:7,min:5,max:60,estado:"NORMAL"},
+      {branch:"MedMart Fairfield",state:"WA",stock:4,min:5,max:60,estado:"BAJO MINIMO"},
+      {branch:"MedMart Riverside",state:"NJ",stock:3,min:5,max:60,estado:"BAJO MINIMO"},
+    ]},
+    {id:"40580",name:"product#40580",cat:"Medications",manuf:"Gramón-Millet",branches:[
+      {branch:"MedMart Northgate",state:"OH",stock:39,min:3,max:30,estado:"SOBRESTOCK"},
+      {branch:"MedMart Parkway",state:"TX",stock:22,min:3,max:30,estado:"NORMAL"},
+      {branch:"MedMart Summit",state:"TX",stock:15,min:3,max:30,estado:"NORMAL"},
+      {branch:"MedMart Stonegate",state:"NC",stock:12,min:3,max:30,estado:"NORMAL"},
+      {branch:"MedMart Meadowbrook",state:"WA",stock:8,min:3,max:30,estado:"NORMAL"},
+      {branch:"MedMart Oakwood",state:"KS",stock:5,min:3,max:30,estado:"NORMAL"},
+      {branch:"MedMart Fairfield",state:"WA",stock:3,min:3,max:30,estado:"NORMAL"},
+      {branch:"MedMart Riverside",state:"NJ",stock:2,min:3,max:30,estado:"BAJO MINIMO"},
+    ]},
+    {id:"19302",name:"product#19302",cat:"Medications",manuf:"Pfizer",branches:[
+      {branch:"MedMart Northgate",state:"OH",stock:217,min:20,max:180,estado:"SOBRESTOCK"},
+      {branch:"MedMart Parkway",state:"TX",stock:150,min:20,max:180,estado:"NORMAL"},
+      {branch:"MedMart Stonegate",state:"NC",stock:75,min:20,max:180,estado:"NORMAL"},
+      {branch:"MedMart Meadowbrook",state:"WA",stock:48,min:20,max:180,estado:"NORMAL"},
+      {branch:"MedMart Oakwood",state:"KS",stock:27,min:20,max:180,estado:"NORMAL"},
+      {branch:"MedMart Summit",state:"TX",stock:21,min:20,max:180,estado:"NORMAL"},
+      {branch:"MedMart Riverside",state:"NJ",stock:6,min:20,max:180,estado:"BAJO MINIMO"},
+    ]},
+    {id:"24064",name:"product#24064",cat:"Perfumery",manuf:"GlaxoSmithKline",branches:[
+      {branch:"MedMart Northgate",state:"OH",stock:16,min:2,max:15,estado:"SOBRESTOCK"},
+      {branch:"MedMart Summit",state:"TX",stock:12,min:2,max:15,estado:"NORMAL"},
+      {branch:"MedMart Parkway",state:"TX",stock:11,min:2,max:15,estado:"NORMAL"},
+      {branch:"MedMart Stonegate",state:"NC",stock:9,min:2,max:15,estado:"NORMAL"},
+      {branch:"MedMart Meadowbrook",state:"WA",stock:6,min:2,max:15,estado:"NORMAL"},
+      {branch:"MedMart Oakwood",state:"KS",stock:4,min:2,max:15,estado:"NORMAL"},
+      {branch:"MedMart Riverside",state:"NJ",stock:2,min:2,max:15,estado:"NORMAL"},
+    ]},
+  ],
+  fechaActualizacion: "2026-04-08"
+};
+</script>
+<!-- TERAMOT_DATA_END -->
+
+<div class="container">
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="kpi-label">SKUs con stock activo</div>
+      <div class="kpi-val" id="k-skus"></div>
+      <div class="kpi-sub">productos únicos en la red</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Sucursales activas</div>
+      <div class="kpi-val" id="k-suc"></div>
+      <div class="kpi-sub">en la red MedMart</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Bajo mínimo</div>
+      <div class="kpi-val" style="color:#A32D2D" id="k-bajo"></div>
+      <div class="kpi-sub">registros producto × sucursal</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">En sobrestock</div>
+      <div class="kpi-val" style="color:#854F0B" id="k-sobre"></div>
+      <div class="kpi-sub">por encima del máximo</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-hdr">1 · Comparativa entre sucursales</div>
+    <div class="card">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Sucursal</th>
+            <th>Estado · ciudad</th>
+            <th>SKUs con stock</th>
+            <th>Bajo mínimo</th>
+            <th>Sobrestock</th>
+            <th>Normal</th>
+            <th>Unidades totales</th>
+            <th>Cobertura prom.</th>
+          </tr>
+        </thead>
+        <tbody id="branch-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="section" style="margin-bottom:0">
+      <div class="sec-hdr">2 · Por categoría</div>
+      <div id="cat-grid" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+    <div class="section" style="margin-bottom:0">
+      <div class="sec-hdr">SKUs por sucursal (top 8)</div>
+      <div class="card chart-wrap"><canvas id="chart-branch"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section" style="margin-top:24px">
+    <div class="sec-hdr">3 · Buscador intra-sucursal · disponibilidad por producto</div>
+    <div class="search-wrap">
+      <input class="search-box" id="search-input" placeholder="Buscar: product#36643, product#42783, product#19302, product#24064..." />
+    </div>
+    <div class="filter-row" id="filter-row">
+      <span class="fpill act" data-filter="all">Todas las sucursales</span>
+      <span class="fpill" data-filter="SOBRESTOCK">Con sobrestock (puede ceder)</span>
+      <span class="fpill" data-filter="BAJO MINIMO">Bajo mínimo (necesita)</span>
+      <span class="fpill" data-filter="NORMAL">Stock normal</span>
+    </div>
+    <div id="search-results"><div class="no-results">Ingresá un nombre o ID de producto para ver su disponibilidad por sucursal.</div></div>
+  </div>
+
+  <div style="text-align:center;font-size:11px;color:#bbb;margin-top:2rem;padding-bottom:1rem">
+    Fuente: gold_dashboard_stock_red_farmacias · Actualizado: <span id="fecha-footer"></span>
+  </div>
+</div>
+
+<script>
+const D = DASHBOARD_DATA;
+document.getElementById('k-skus').textContent = D.kpis.skus.toLocaleString('es');
+document.getElementById('k-suc').textContent = D.kpis.sucursales;
+document.getElementById('k-bajo').textContent = D.kpis.bajo_minimo.toLocaleString('es');
+document.getElementById('k-sobre').textContent = D.kpis.sobrestock.toLocaleString('es');
+document.getElementById('fecha-act').textContent = 'Actualizado: ' + D.fechaActualizacion;
+document.getElementById('fecha-footer').textContent = D.fechaActualizacion;
+
+const COLORS = ["#378ADD","#1D9E75","#D85A30","#7F77DD","#BA7517","#E24B4A","#5DCAA5","#533AB7","#EF9F27","#639922","#D4537E","#0F6E56","#F09595","#888780","#AFA9EC","#5DCAA5","#9FE1CB","#F5C4B3","#9b98b0","#63b3ed"];
+const maxSkus = Math.max(...D.branches.map(b=>b.skus));
+const tbody = document.getElementById('branch-tbody');
+D.branches.forEach((b,i)=>{
+  const pctBajo = b.skus>0?Math.round(b.bajo/b.skus*1000)/10:0;
+  let estado = '<span class="badge b-neutral">Sin parámetros</span>';
+  if(b.bajo>0&&pctBajo>10) estado='<span class="badge b-danger">Crítico</span>';
+  else if(b.bajo>0&&pctBajo>5) estado='<span class="badge b-warning">Atención</span>';
+  else if(b.bajo>0||b.sobre>0) estado='<span class="badge b-ok">Con alertas</span>';
+  const barW = Math.round(b.skus/maxSkus*72);
+  tbody.innerHTML+=`<tr>
+    <td><span class="dot" style="background:${COLORS[i%COLORS.length]}"></span>${b.name}${b.hq?' <span class="badge b-info" style="font-size:10px">HQ</span>':''}</td>
+    <td style="color:#888">${b.state} · ${b.city}</td>
+    <td><div class="bar-track"><div class="bar-fill" style="width:${barW}px;background:${COLORS[i%COLORS.length]}"></div></div><span style="font-size:12px;margin-left:6px">${b.skus.toLocaleString('es')}</span></td>
+    <td>${b.bajo>0?`<span style="color:#A32D2D;font-weight:600">${b.bajo}</span> <span style="font-size:11px;color:#ccc">(${pctBajo}%)</span>`:'<span style="color:#ccc">—</span>'}</td>
+    <td>${b.sobre>0?`<span style="color:#854F0B;font-weight:600">${b.sobre}</span>`:'<span style="color:#ccc">—</span>'}</td>
+    <td>${b.normal>0?`<span style="color:#3B6D11;font-weight:600">${b.normal}</span>`:'<span style="color:#ccc">—</span>'}</td>
+    <td style="color:#888">${b.units.toLocaleString('es')}</td>
+    <td>${b.cob?`<span style="color:${b.cob>200?'#854F0B':b.cob>100?'#185FA5':'#3B6D11'};font-weight:500">${b.cob}%</span>`:'<span style="color:#ccc">sin config.</span>'}</td>
+  </tr>`;
+});
+
+const catGrid = document.getElementById('cat-grid');
+D.categories.forEach(c=>{
+  const total = c.bajo+c.sobre+c.normal||1;
+  const pB=Math.round(c.bajo/total*100), pS=Math.round(c.sobre/total*100), pN=Math.round(c.normal/total*100);
+  catGrid.innerHTML+=`<div class="cat-card">
+    <div class="cat-name"><span class="dot" style="background:${c.color}"></span>${c.name} <span style="font-size:11px;color:#aaa">${c.skus.toLocaleString('es')} SKUs</span></div>
+    <div class="cat-row"><span class="cat-lbl">Bajo mínimo</span><div class="cat-bar"><div class="cat-bar-fill" style="width:${pB}%;background:#E24B4A"></div></div><span class="cat-val" style="color:#A32D2D">${c.bajo}</span></div>
+    <div class="cat-row"><span class="cat-lbl">Sobrestock</span><div class="cat-bar"><div class="cat-bar-fill" style="width:${pS}%;background:#EF9F27"></div></div><span class="cat-val" style="color:#854F0B">${c.sobre}</span></div>
+    <div class="cat-row"><span class="cat-lbl">Normal</span><div class="cat-bar"><div class="cat-bar-fill" style="width:${pN}%;background:#639922"></div></div><span class="cat-val" style="color:#3B6D11">${c.normal}</span></div>
+  </div>`;
+});
+
+const top8 = D.branches.slice(0,8);
+new Chart(document.getElementById('chart-branch'),{
+  type:'bar',
+  data:{
+    labels:top8.map(b=>b.name.replace('MedMart ','')),
+    datasets:[{
+      label:'SKUs con stock',
+      data:top8.map(b=>b.skus),
+      backgroundColor:top8.map((_,i)=>COLORS[i]+'cc'),
+      borderColor:top8.map((_,i)=>COLORS[i]),
+      borderWidth:1,
+      borderRadius:4
+    }]
+  },
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{grid:{color:'#f0f0ea'},ticks:{font:{size:11}}},x:{grid:{display:false},ticks:{font:{size:11}}}}}
+});
+
+let activeFilter = 'all';
+document.querySelectorAll('.fpill').forEach(el=>{
+  el.addEventListener('click',()=>{
+    document.querySelectorAll('.fpill').forEach(p=>p.classList.remove('act'));
+    el.classList.add('act');
+    activeFilter = el.dataset.filter;
+    doSearch();
+  });
+});
+
+function estadoBadge(e){
+  if(e==='SOBRESTOCK') return '<span class="badge b-warning">Sobrestock</span>';
+  if(e==='BAJO MINIMO') return '<span class="badge b-danger">Bajo mínimo</span>';
+  if(e==='NORMAL') return '<span class="badge b-ok">Normal</span>';
+  return '<span class="badge b-neutral">Sin param.</span>';
+}
+function sugerencia(e){
+  if(e==='SOBRESTOCK') return '<span style="color:#185FA5;font-size:11px;font-weight:600">→ Puede ceder</span>';
+  if(e==='BAJO MINIMO') return '<span style="color:#A32D2D;font-size:11px">← Necesita stock</span>';
+  return '';
+}
+
+function doSearch(){
+  const q = document.getElementById('search-input').value.toLowerCase().trim();
+  const res = document.getElementById('search-results');
+  if(!q){res.innerHTML='<div class="no-results">Ingresá un nombre o ID de producto para ver su disponibilidad por sucursal.</div>';return;}
+  const matches = D.products.filter(p=>p.name.toLowerCase().includes(q)||p.id.includes(q)||p.manuf.toLowerCase().includes(q)||p.cat.toLowerCase().includes(q));
+  if(!matches.length){res.innerHTML=`<div class="no-results">Sin resultados para "${q}".<br><span style="font-size:11px">Probá: product#36643 · product#42783 · product#19302 · product#24064</span></div>`;return;}
+  res.innerHTML = matches.map(p=>{
+    let rows = p.branches;
+    if(activeFilter!=='all') rows=rows.filter(r=>r.estado===activeFilter);
+    const canGive = p.branches.filter(r=>r.estado==='SOBRESTOCK');
+    const needStock = p.branches.filter(r=>r.estado==='BAJO MINIMO');
+    const alertas = [];
+    if(canGive.length) alertas.push(`<span class="badge b-warning">${canGive.length} con excedente</span>`);
+    if(needStock.length) alertas.push(`<span class="badge b-danger">${needStock.length} bajo mínimo</span>`);
+    if(canGive.length&&needStock.length) alertas.push('<span class="badge b-info">Transferencia intra-sucursal posible</span>');
+    const rowsHtml = rows.map(r=>`<tr>
+      <td><span class="dot" style="background:${r.estado==='SOBRESTOCK'?'#EF9F27':r.estado==='BAJO MINIMO'?'#E24B4A':'#639922'}"></span>${r.branch}</td>
+      <td style="color:#888">${r.state}</td>
+      <td style="font-weight:600">${r.stock}</td>
+      <td style="color:#aaa">${r.min}</td>
+      <td style="color:#aaa">${r.max}</td>
+      <td>${estadoBadge(r.estado)}</td>
+      <td>${sugerencia(r.estado)}</td>
+    </tr>`).join('');
+    return `<div class="result-card">
+      <div class="result-hdr">
+        <span class="result-hdr-name">${p.name}</span>
+        <span class="result-hdr-meta">${p.cat} · ${p.manuf}</span>
+        ${alertas.join(' ')}
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Sucursal</th><th>Estado</th><th>Stock actual</th><th>Mínimo</th><th>Máximo</th><th>Estado stock</th><th>Acción sugerida</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+}
+document.getElementById('search-input').addEventListener('input', doSearch);
+</script>
+</body>
+</html>

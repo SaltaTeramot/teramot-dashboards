@@ -1,0 +1,9 @@
+{
+  "nombre": "stock-red-farmacias",
+  "cliente": "MedMart",
+  "gold_table": "gold_dashboard_stock_red_farmacias",
+  "athena_database": "teramot_gold",
+  "athena_output": "s3://s3://athenas3bktsalta//dashboards/",
+  "refresh_hour_utc": 10,
+  "creado": "2026-04-08"
+}
