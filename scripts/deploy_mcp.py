@@ -230,7 +230,8 @@ if __name__ == "__main__":
     if "--http" in sys.argv:
         import uvicorn
         port = int(os.environ.get("MCP_PORT", "8080"))
-        print(f"Iniciando MCP server HTTP/SSE en http://0.0.0.0:{port}/sse")
-        uvicorn.run(mcp.sse_app(), host="0.0.0.0", port=port)
+        print(f"Iniciando MCP server Streamable HTTP en http://0.0.0.0:{port}/mcp")
+        # Streamable HTTP transport (MCP spec 2025-03-26) — requerido por claude.ai web
+        uvicorn.run(mcp.streamable_http_app(), host="0.0.0.0", port=port)
     else:
         mcp.run()  # stdio (default para Claude Code CLI)
