@@ -1,6 +1,9 @@
 #!/bin/bash
 # Arranca el MCP server HTTP/SSE y expone el tunnel con ngrok.
 # Uso: ./scripts/start_mcp_server.sh
+#
+# El .env es cargado por Python (python-dotenv), no por bash,
+# para evitar problemas con espacios en las rutas.
 
 set -e
 
@@ -8,14 +11,17 @@ PYTHON=/usr/local/bin/python3.11
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Cargar .env si existe
-if [ -f "$REPO_DIR/.env" ]; then
-  set -a
-  source "$REPO_DIR/.env"
-  set +a
-fi
-
-PORT="${MCP_PORT:-8080}"
+# Leer MCP_PORT del .env usando Python (maneja espacios correctamente)
+PORT=$($PYTHON - <<EOF
+from pathlib import Path
+try:
+    from dotenv import dotenv_values
+    v = dotenv_values(Path("$REPO_DIR") / ".env")
+    print(v.get("MCP_PORT", "8080"))
+except Exception:
+    print("8080")
+EOF
+)
 
 # Verificar que ngrok esté instalado
 if ! command -v ngrok &>/dev/null; then
@@ -42,6 +48,7 @@ echo "========================================"
 echo ""
 
 # Arrancar el MCP server en background
+# Python carga el .env internamente con python-dotenv
 echo "[1/2] Iniciando MCP server..."
 $PYTHON "$SCRIPT_DIR/deploy_mcp.py" --http &
 MCP_PID=$!
@@ -58,15 +65,15 @@ fi
 echo "      MCP server corriendo (PID $MCP_PID)"
 echo ""
 
-# Trap para limpiar el MCP server al salir
+# Trap para limpiar todo al salir
 trap "echo ''; echo 'Deteniendo MCP server...'; kill $MCP_PID 2>/dev/null; exit 0" INT TERM
 
-# Arrancar ngrok y capturar la URL pública
+# Arrancar ngrok en background
 echo "[2/2] Iniciando ngrok tunnel en puerto $PORT..."
-ngrok http $PORT --log=stdout --log-format=json &
+ngrok http "$PORT" --log=stdout --log-format=json &
 NGROK_PID=$!
 
-# Esperar a que ngrok exponga la URL
+# Esperar a que ngrok exponga la URL (consulta la API local de ngrok)
 echo "      Esperando URL pública de ngrok..."
 NGROK_URL=""
 for i in $(seq 1 15); do
