@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Ejemplo — Teramot</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #222; }
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 1.4rem; font-weight: 600; }
+    header span { font-size: 0.85rem; opacity: 0.7; }
+    .container { max-width: 1100px; margin: 32px auto; padding: 0 24px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .card .label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: .05em; color: #888; margin-bottom: 6px; }
+    .card .value { font-size: 2rem; font-weight: 700; color: #1a1a2e; }
+    .chart-box {
+      background: #fff;
+      border-radius: 10px;
+      padding: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      margin-bottom: 24px;
+    }
+    .chart-box h2 { font-size: 1rem; font-weight: 600; margin-bottom: 16px; }
+    canvas { max-height: 320px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Dashboard Ejemplo</h1>
+  <span id="fecha-update"></span>
+</header>
+
+<!-- TERAMOT_DATA_START -->
+<script>
+const DASHBOARD_DATA = {
+  "rows": [
+    {"mes": "Ene", "ventas": 120000, "unidades": 340},
+    {"mes": "Feb", "ventas": 145000, "unidades": 410},
+    {"mes": "Mar", "ventas": 132000, "unidades": 375},
+    {"mes": "Abr", "ventas": 168000, "unidades": 480},
+    {"mes": "May", "ventas": 155000, "unidades": 445},
+    {"mes": "Jun", "ventas": 190000, "unidades": 540}
+  ],
+  "fechaActualizacion": "2026-04-08"
+};
+</script>
+<!-- TERAMOT_DATA_END -->
+
+<div class="container">
+  <div class="cards">
+    <div class="card">
+      <div class="label">Ventas totales</div>
+      <div class="value" id="kpi-ventas">—</div>
+    </div>
+    <div class="card">
+      <div class="label">Unidades totales</div>
+      <div class="value" id="kpi-unidades">—</div>
+    </div>
+    <div class="card">
+      <div class="label">Ticket promedio</div>
+      <div class="value" id="kpi-ticket">—</div>
+    </div>
+  </div>
+
+  <div class="chart-box">
+    <h2>Ventas mensuales</h2>
+    <canvas id="chart-ventas"></canvas>
+  </div>
+
+  <div class="chart-box">
+    <h2>Unidades mensuales</h2>
+    <canvas id="chart-unidades"></canvas>
+  </div>
+</div>
+
+<script>
+  const rows = DASHBOARD_DATA.rows;
+
+  // KPIs
+  const totalVentas = rows.reduce((s, r) => s + Number(r.ventas), 0);
+  const totalUnidades = rows.reduce((s, r) => s + Number(r.unidades), 0);
+  const ticket = totalUnidades ? totalVentas / totalUnidades : 0;
+
+  document.getElementById("kpi-ventas").textContent =
+    "$" + totalVentas.toLocaleString("es-AR");
+  document.getElementById("kpi-unidades").textContent =
+    totalUnidades.toLocaleString("es-AR");
+  document.getElementById("kpi-ticket").textContent =
+    "$" + Math.round(ticket).toLocaleString("es-AR");
+  document.getElementById("fecha-update").textContent =
+    "Actualizado: " + DASHBOARD_DATA.fechaActualizacion;
+
+  // Chart ventas
+  new Chart(document.getElementById("chart-ventas"), {
+    type: "bar",
+    data: {
+      labels: rows.map(r => r.mes),
+      datasets: [{
+        label: "Ventas ($)",
+        data: rows.map(r => Number(r.ventas)),
+        backgroundColor: "#4f46e5",
+        borderRadius: 6,
+      }]
+    },
+    options: { plugins: { legend: { display: false } }, responsive: true }
+  });
+
+  // Chart unidades
+  new Chart(document.getElementById("chart-unidades"), {
+    type: "line",
+    data: {
+      labels: rows.map(r => r.mes),
+      datasets: [{
+        label: "Unidades",
+        data: rows.map(r => Number(r.unidades)),
+        borderColor: "#10b981",
+        backgroundColor: "rgba(16,185,129,.1)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+      }]
+    },
+    options: { plugins: { legend: { display: false } }, responsive: true }
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "nombre": "ejemplo",
+  "cliente": "Teramot Demo",
+  "gold_table": "gold_ventas_ejemplo",
+  "athena_database": "teramot_gold",
+  "athena_output": "s3://teramot-athena-results/dashboards/",
+  "refresh_hour_utc": 10,
+  "creado": "2026-04-08"
+}
