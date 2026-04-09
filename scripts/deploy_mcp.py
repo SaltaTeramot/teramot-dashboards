@@ -10,6 +10,7 @@ Modos de ejecución:
 
 import json
 import os
+import re
 import subprocess
 import sys
 import textwrap
@@ -171,6 +172,8 @@ async def deploy_dashboard(
         cliente: Nombre legible del cliente (ej: Farmacia Demo)
         athena_database: Base de datos en Athena (default: teramot_gold)
     """
+    if not re.match(r'^[a-z0-9\-]+$', nombre):
+        return "ERROR: 'nombre' debe ser un slug en minúsculas con guiones (ej: farmacia-ventas). Sin espacios, sin mayúsculas, sin caracteres especiales."
     if "<!-- TERAMOT_DATA_START -->" not in html or "<!-- TERAMOT_DATA_END -->" not in html:
         return "ERROR: El HTML no contiene los delimitadores TERAMOT_DATA_START/END."
 

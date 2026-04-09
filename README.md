@@ -34,9 +34,11 @@ Ver `.env.example`. Las más importantes:
 |---|---|
 | `AWS_ACCESS_KEY_ID` | Credencial AWS |
 | `AWS_SECRET_ACCESS_KEY` | Credencial AWS |
+| `AWS_DEFAULT_REGION` | Región AWS (ej: us-east-1) |
 | `ATHENA_OUTPUT_BUCKET` | Bucket S3 para resultados de Athena |
 | `GITHUB_REPO_PATH` | Ruta local al repo clonado |
 | `GITHUB_PAGES_URL` | URL base de GitHub Pages |
+| `MCP_PORT` | Puerto local del MCP server HTTP (default: 8080) |
 
 En GitHub Actions, estas variables van como **Secrets** (Settings → Secrets → Actions).
 
